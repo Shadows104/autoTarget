@@ -1,0 +1,8 @@
+.auto-target-prompt .window-content { padding: 0.5rem; gap: 0.5rem; }
+.auto-target-prompt .at-counter { font-weight: bold; }
+.auto-target-prompt .at-range { opacity: 0.8; }
+.auto-target-prompt ul.at-list { list-style: none; margin: 0; padding: 0; }
+.auto-target-prompt li.at-out { color: var(--color-level-error, #c33); }
+.auto-target-prompt .at-empty { font-style: italic; opacity: 0.7; }
+.auto-target-prompt footer { display: flex; gap: 0.5rem; }
+.auto-target-prompt footer button { flex: 1; }

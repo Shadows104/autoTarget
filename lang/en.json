@@ -1,0 +1,18 @@
+{
+  "AUTOTARGET.Title": "Select Targets",
+  "AUTOTARGET.Counter": "{count} of up to {max} targets",
+  "AUTOTARGET.Range": "Range: {range}",
+  "AUTOTARGET.NoTargets": "Click a token to target it.",
+  "AUTOTARGET.OutOfRange": "out of range",
+  "AUTOTARGET.Confirm": "Confirm",
+  "AUTOTARGET.Cancel": "Cancel",
+  "AUTOTARGET.MaxReached": "This can only target {max}.",
+  "AUTOTARGET.WarnOutOfRange": "{names} out of range ({range}).",
+  "AUTOTARGET.SettingEnabled": "Enable target prompt",
+  "AUTOTARGET.SettingEnabledHint": "Prompt for targets before using activities that name a target and range.",
+  "AUTOTARGET.SettingCleanup": "Remove timed areas when they expire",
+  "AUTOTARGET.SettingCleanupHint": "Timed areas are removed when their duration ends (combat rounds in combat, otherwise world time). Instantaneous, permanent, until-dispelled and special areas are kept.",
+  "AUTOTARGET.ClearAreas": "Clear Spell Areas",
+  "AUTOTARGET.ClearAreasConfirm": "Remove {count} spell area(s) from this scene?",
+  "AUTOTARGET.NoAreas": "There are no spell areas on this scene."
+}
