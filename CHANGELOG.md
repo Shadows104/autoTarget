@@ -2,7 +2,7 @@
 
 All notable changes to Auto Target Prompt. Targets Foundry VTT v14 and dnd5e 6.0.
 
-## [Unreleased]
+## [0.1.0] - 2026-10-08
 
 ### Added
 - Target prompt shown before an activity is used, for activities that name a creature target and a range.
