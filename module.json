@@ -2,7 +2,7 @@
   "id": "auto-target",
   "title": "Auto Target Prompt",
   "description": "Prompts players to target tokens when using weapons, spells and other activities, checking range as written on the item and allowing anywhere from 1 up to the maximum number of targets.",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "compatibility": {
     "minimum": "14",
     "verified": "14"
@@ -17,5 +17,5 @@
   "url": "https://github.com/Shadows104/autoTarget",
   "changelog": "https://github.com/Shadows104/autoTarget/blob/main/CHANGELOG.md",
   "manifest": "https://github.com/Shadows104/autoTarget/releases/latest/download/module.json",
-  "download": "https://github.com/Shadows104/autoTarget/releases/download/v0.2.1/module.zip"
+  "download": "https://github.com/Shadows104/autoTarget/releases/download/v0.2.2/module.zip"
 }

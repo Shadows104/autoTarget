@@ -2,6 +2,11 @@
 
 All notable changes to Auto Target Prompt. Targets Foundry VTT v14 and dnd5e 6.0.
 
+## [0.2.2] - 2026-11-12
+
+### Added
+- GitHub Actions workflow that publishes a release with `module.json` and `module.zip` attached whenever a version tag is pushed, so the manifest and download links in `module.json` work. v0.2.1 was tagged before the workflow existed and has no release files; install 0.2.2 or later.
+
 ## [0.2.1] - 2026-11-12
 
 ### Changed
