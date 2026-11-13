@@ -4,10 +4,27 @@ const { ApplicationV2 } = foundry.applications.api;
 const MODULE_ID = "auto-target";
 
 /**
+ * Install (once) a Token#setTarget wrapper that makes clicks additive while a prompt is open.
+ * It is permanent but inert unless TargetPrompt.active is set, so nothing needs restoring.
+ */
+export function installTargetPatch() {
+  const proto = CONFIG.Token.objectClass.prototype;
+  if (proto.setTarget.__autoTarget) return;
+  const original = proto.setTarget;
+  proto.setTarget = function (targeted = true, options = {}) {
+    return original.call(this, targeted, TargetPrompt.active ? { ...options, releaseOthers: false } : options);
+  };
+  proto.setTarget.__autoTarget = true;
+}
+
+/**
  * Small floating panel shown while the player picks targets with Foundry's normal targeting.
  * Resolves true on Confirm (1..max targets), false on Cancel/close.
  */
 export class TargetPrompt extends ApplicationV2 {
+  /** The prompt currently open on this client, if any. */
+  static active = null;
+
   static DEFAULT_OPTIONS = {
     id: "auto-target-prompt",
     classes: ["auto-target-prompt"],
@@ -15,6 +32,7 @@ export class TargetPrompt extends ApplicationV2 {
     position: { width: 320, height: "auto" },
     actions: {
       confirm: TargetPrompt.#onConfirm,
+      skip: TargetPrompt.#onSkip,
       cancel: TargetPrompt.#onCancel
     }
   };
@@ -32,29 +50,18 @@ export class TargetPrompt extends ApplicationV2 {
     this.source = source; // the acting token
     this.#promise = new Promise(res => { this.#resolve = res; });
     this.#hookId = Hooks.on("targetToken", (user, token, targeted) => this.#onTarget(user, token, targeted));
-    this.#patchClicks();
+    TargetPrompt.active = this;
+    this.#activateTargetTool();
   }
 
   #promise; #resolve; #hookId; #done = false; #unpatch;
 
-  /**
-   * While open, switch to Foundry's Target tool so a plain left-click targets any token,
-   * and make clicks additive (the tool normally replaces existing targets unless Shift is held).
-   */
-  #patchClicks() {
+  /** While open, switch to Foundry's Target tool so a plain left-click targets any token. */
+  #activateTargetTool() {
     const prevControl = ui.controls.control?.name;
     const prevTool = ui.controls.tool?.name;
     ui.controls.activate({ control: "tokens", tool: "target" });
-
-    const proto = CONFIG.Token.objectClass.prototype;
-    const hadOwn = Object.hasOwn(proto, "setTarget");
-    const original = proto.setTarget;
-    proto.setTarget = function (targeted = true, options = {}) {
-      return original.call(this, targeted, { ...options, releaseOthers: false });
-    };
     this.#unpatch = () => {
-      if (hadOwn) proto.setTarget = original;
-      else delete proto.setTarget;
       if (prevControl && prevTool) ui.controls.activate({ control: prevControl, tool: prevTool });
     };
   }
@@ -85,7 +92,9 @@ export class TargetPrompt extends ApplicationV2 {
     });
     const root = document.createElement("div");
     root.innerHTML = `
-      <div class="at-counter">${game.i18n.format("AUTOTARGET.Counter", { count: items.length, max: this.max })}</div>
+      <div class="at-counter">${Number.isFinite(this.max)
+        ? game.i18n.format("AUTOTARGET.Counter", { count: items.length, max: this.max })
+        : game.i18n.format("AUTOTARGET.CounterUnlimited", { count: items.length })}</div>
       <div class="at-range">${game.i18n.format("AUTOTARGET.Range", { range: foundry.utils.escapeHTML(this.range.label) })}</div>
       ${items.length ? "" : `<div class="at-empty">${game.i18n.localize("AUTOTARGET.NoTargets")}</div>`}
       <ul class="at-list">
@@ -94,6 +103,7 @@ export class TargetPrompt extends ApplicationV2 {
       </ul>
       <footer>
         <button type="button" data-action="confirm" ${items.length ? "" : "disabled"}>${game.i18n.localize("AUTOTARGET.Confirm")}</button>
+        <button type="button" data-action="skip" data-tooltip="${game.i18n.localize("AUTOTARGET.SkipHint")}">${game.i18n.localize("AUTOTARGET.Skip")}</button>
         <button type="button" data-action="cancel">${game.i18n.localize("AUTOTARGET.Cancel")}</button>
       </footer>`;
     this._outOfRange = items.filter(i => i.status === "out").map(i => i.name);
@@ -109,6 +119,7 @@ export class TargetPrompt extends ApplicationV2 {
     if (this.#done) return;
     this.#done = true;
     Hooks.off("targetToken", this.#hookId);
+    if (TargetPrompt.active === this) TargetPrompt.active = null;
     this.#unpatch?.();
     this.#resolve(value);
   }
@@ -119,6 +130,13 @@ export class TargetPrompt extends ApplicationV2 {
         names: this._outOfRange.join(", "), range: this.range.label
       }));
     }
+    this.#finish(true);
+    this.close();
+  }
+
+  /** Use the ability without any targets. */
+  static #onSkip() {
+    for (const t of [...game.user.targets]) t.setTarget(false, { releaseOthers: false, groupSelection: true });
     this.#finish(true);
     this.close();
   }

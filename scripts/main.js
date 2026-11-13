@@ -1,5 +1,6 @@
 import { getRange, getMaxTargets } from "./range.js";
-import { TargetPrompt } from "./prompt.js";
+import { TargetPrompt, installTargetPatch } from "./prompt.js";
+import { promptAreaTargets, initAreaCardFix } from "./area.js";
 import { registerRegionSettings, initRegionCleanup } from "./regions.js";
 
 const MODULE_ID = "auto-target";
@@ -9,13 +10,17 @@ const MODULE_ID = "auto-target";
  * use() clones the item on every call, so we key by stable UUID rather than object identity.
  */
 const approved = new Set();
-/** Attack uses awaiting their attack roll, so the actor sheet can be restored: key -> { restoreSheet, timer }. */
+/** Attack uses awaiting their attack roll: key -> { finish, restoreSheet, timer }. */
 const sessions = new Map();
+/** Attacks that have been rolled whose targets are being kept for the damage roll. */
+const awaitingDamage = new Set();
 const keyFor = activity => `${activity.actor?.uuid}|${activity.relativeUUID}`;
 
 const clearTargets = () => {
   for (const t of [...game.user.targets]) t.setTarget(false, { releaseOthers: false, groupSelection: true });
 };
+
+Hooks.once("ready", installTargetPatch);
 
 Hooks.once("init", () => {
   game.settings.register(MODULE_ID, "enabled", {
@@ -46,6 +51,8 @@ Hooks.on("dnd5e.preUseActivity", (activity, usageConfig, dialogConfig, messageCo
 
   const actor = activity.actor;
   if (!actor || !canvas?.ready) return;
+  // Only one prompt at a time (also swallows an accidental double-click on an item).
+  if (TargetPrompt.active) { TargetPrompt.active.bringToFront(); return false; }
 
   const range = getRange(activity);
   const max = getMaxTargets(activity);
@@ -58,53 +65,77 @@ Hooks.on("dnd5e.preUseActivity", (activity, usageConfig, dialogConfig, messageCo
     // Get the actor sheet out of the way while targeting, and bring it back afterwards.
     const sheet = actor.sheet;
     const wasOpen = sheet?.rendered && !sheet.minimized;
-    if (wasOpen) await sheet.minimize();
     const restoreSheet = () => { if (wasOpen && sheet.rendered && sheet.minimized) sheet.maximize(); };
-
-    clearTargets(); // start from a clean slate, not leftovers from an earlier use
-    const ok = await new TargetPrompt({ activity, range, max, source }).prompt();
-    if (!ok) { clearTargets(); return restoreSheet(); }
-
     const key = keyFor(activity);
-    const isAttack = activity.type === "attack";
-    // For attacks, the sheet comes back and targets clear only once the attack roll has been made;
-    // the timer covers a cancelled roll dialog.
     const finish = () => { restoreSheet(); clearTargets(); };
-    if (isAttack) {
-      const timer = setTimeout(() => { sessions.delete(key); finish(); }, 120000);
-      sessions.set(key, { finish, timer });
-    } else restoreSheet();
+    let started = false;
 
-    // The hook's activity belongs to a throwaway item clone; re-run on the real one.
-    const real = actor.items.get(activity.item.id)?.system.activities?.get(activity.id) ?? activity;
-    // Drop the target snapshot taken before the prompt so dnd5e re-reads the chosen targets.
-    foundry.utils.deleteProperty(messageConfig, "data.system.targets");
-
-    approved.add(key);
     try {
-      await real.use(usageConfig, dialogConfig, messageConfig);
+      if (wasOpen) await sheet.minimize();
+      clearTargets(); // start from a clean slate, not leftovers from an earlier use
+      const ok = await new TargetPrompt({ activity, range, max, source }).prompt();
+      if (!ok) return finish();
+
+      const isAttack = activity.type === "attack";
+      // For attacks, the sheet comes back once the attack is rolled and targets stay for the damage roll;
+      // the timer covers a cancelled roll dialog.
+      if (isAttack) {
+        const timer = setTimeout(() => { sessions.delete(key); finish(); }, 120000);
+        sessions.set(key, { finish, restoreSheet, timer });
+      } else restoreSheet();
+
+      // The hook's activity belongs to a throwaway item clone; re-run on the real one.
+      const real = actor.items.get(activity.item.id)?.system.activities?.get(activity.id) ?? activity;
+      // Drop the target snapshot taken before the prompt so dnd5e re-reads the chosen targets.
+      foundry.utils.deleteProperty(messageConfig, "data.system.targets");
+
+      approved.add(key);
+      started = true;
+      const results = await real.use(usageConfig, dialogConfig, messageConfig);
+      // Use was cancelled (configuration dialog closed, not enough resources...): no roll is coming.
+      if (!results && sessions.has(key)) {
+        clearTimeout(sessions.get(key).timer);
+        sessions.delete(key);
+        finish();
+      } else if (!isAttack) clearTargets(); // attack targets are kept for the damage roll (see below)
     } catch (err) {
       const session = sessions.get(key);
       if (session) { clearTimeout(session.timer); sessions.delete(key); }
       finish();
       throw err;
     } finally {
-      approved.delete(key);
-      if (!isAttack) clearTargets(); // attacks clear after the roll, in the postRollAttack hook
+      if (started) approved.delete(key);
     }
   })();
 
   return false;
 });
 
-/** Once the attack roll we prompted for has been made, bring the actor sheet back and reset targets. */
+/** Once the attack roll we prompted for has been made, bring the actor sheet back but keep the targets. */
 Hooks.on("dnd5e.postRollAttack", (rolls, { subject }) => {
   const key = subject && keyFor(subject);
   const session = sessions.get(key);
   if (!session) return;
   sessions.delete(key);
   clearTimeout(session.timer);
-  session.finish();
+  session.restoreSheet();
+  awaitingDamage.add(key);
 });
 
+/**
+ * dnd5e reads the current targets when damage is rolled, so they must survive until then.
+ * Clear them once that damage has been rolled. (A miss leaves them until the next prompt, which resets them.)
+ */
+Hooks.on("dnd5e.rollDamage", (rolls, { subject }) => {
+  if (subject && awaitingDamage.delete(keyFor(subject))) clearTargets();
+});
+
+/** Area spells: once dnd5e has placed the template, let the player click who is caught in it. */
+Hooks.on("dnd5e.postUseActivity", (activity, usageConfig, results) => {
+  if (!game.settings.get(MODULE_ID, "enabled")) return;
+  if (!activity.target?.template?.type || !results?.templates?.length) return;
+  promptAreaTargets(activity, results, clearTargets);
+});
+
+initAreaCardFix();
 initRegionCleanup();

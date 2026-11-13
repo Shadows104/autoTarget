@@ -74,15 +74,27 @@ function isExpired(plan) {
 }
 
 /** Delete every expired region we planned. Only the active GM runs this. */
+let sweeping = false;
 async function sweep() {
-  if (!game.user.isActiveGM || !game.settings.get(MODULE_ID, "cleanUpRegions")) return;
-  for (const scene of game.scenes) {
-    const ids = scene.regions.filter(r => isExpired(r.getFlag(MODULE_ID, FLAG))).map(r => r.id);
-    if (!ids.length) continue;
-    try { await scene.deleteEmbeddedDocuments("Region", ids); }
-    catch (err) { console.warn(`${MODULE_ID} | could not remove expired regions`, err); }
+  if (sweeping || !game.user.isActiveGM || !game.settings.get(MODULE_ID, "cleanUpRegions")) return;
+  sweeping = true; // avoid overlapping sweeps trying to delete the same regions twice
+  try {
+    for (const scene of game.scenes) {
+      if (!scene.regions.size) continue;
+      const ids = scene.regions.filter(r => isExpired(r.getFlag(MODULE_ID, FLAG))).map(r => r.id);
+      if (!ids.length) continue;
+      try { await scene.deleteEmbeddedDocuments("Region", ids); }
+      catch (err) { console.warn(`${MODULE_ID} | could not remove expired regions`, err); }
+    }
+  } finally {
+    sweeping = false;
   }
 }
+
+/** Combat updates fire for HP, flags, etc.; only the turn order moving can expire an area. */
+const sweepOnTurnChange = (combat, changed) => {
+  if ("round" in changed || "turn" in changed) sweep();
+};
 
 export function initRegionCleanup() {
   // The placing user's client records the plan.
@@ -96,7 +108,7 @@ export function initRegionCleanup() {
   });
 
   // The GM sweeps as time moves, plus once on load for anything that expired while away.
-  Hooks.on("updateCombat", sweep);
+  Hooks.on("updateCombat", sweepOnTurnChange);
   Hooks.on("deleteCombat", sweep);
   Hooks.on("updateWorldTime", sweep);
   Hooks.once("ready", sweep);

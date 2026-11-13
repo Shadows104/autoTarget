@@ -2,7 +2,7 @@
   "AUTOTARGET.Title": "Select Targets",
   "AUTOTARGET.Counter": "{count} of up to {max} targets",
   "AUTOTARGET.Range": "Range: {range}",
-  "AUTOTARGET.NoTargets": "Click a token to target it.",
+  "AUTOTARGET.NoTargets": "Click a token to target it, or Skip to continue without targets.",
   "AUTOTARGET.OutOfRange": "out of range",
   "AUTOTARGET.Confirm": "Confirm",
   "AUTOTARGET.Cancel": "Cancel",
@@ -14,5 +14,9 @@
   "AUTOTARGET.SettingCleanupHint": "Timed areas are removed when their duration ends (combat rounds in combat, otherwise world time). Instantaneous, permanent, until-dispelled and special areas are kept.",
   "AUTOTARGET.ClearAreas": "Clear Spell Areas",
   "AUTOTARGET.ClearAreasConfirm": "Remove {count} spell area(s) from this scene?",
-  "AUTOTARGET.NoAreas": "There are no spell areas on this scene."
+  "AUTOTARGET.NoAreas": "There are no spell areas on this scene.",
+  "AUTOTARGET.Skip": "Skip",
+  "AUTOTARGET.SkipHint": "Use this without targeting anything",
+  "AUTOTARGET.CounterUnlimited": "{count} targets",
+  "AUTOTARGET.AreaLabel": "Area (placed template)"
 }

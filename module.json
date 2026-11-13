@@ -2,7 +2,7 @@
   "id": "auto-target",
   "title": "Auto Target Prompt",
   "description": "Prompts players to target tokens when using weapons, spells and other activities, checking range as written on the item and allowing anywhere from 1 up to the maximum number of targets.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "compatibility": { "minimum": "14", "verified": "14" },
   "relationships": {
     "systems": [{ "id": "dnd5e", "type": "system", "compatibility": { "minimum": "6.0.0" } }]
