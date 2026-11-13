@@ -2,6 +2,11 @@
 
 All notable changes to Auto Target Prompt. Targets Foundry VTT v14 and dnd5e 6.0.
 
+## [0.2.1] - 2026-11-12
+
+### Changed
+- Module manifest now includes author, project and changelog links, and the manifest/download URLs needed to install the module from a GitHub release. No code changes.
+
 ## [0.2.0] - 2026-11-12
 
 ### Added
