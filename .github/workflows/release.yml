@@ -1,0 +1,52 @@
+name: Release
+
+# Runs when a version tag such as v0.2.1 is pushed.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Check tag matches module.json
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="$(jq -r .version module.json)"
+          DOWNLOAD="$(jq -r .download module.json)"
+          if [ "v${VERSION}" != "${TAG}" ]; then
+            echo "::error::Tag ${TAG} does not match module.json version ${VERSION}"
+            exit 1
+          fi
+          case "${DOWNLOAD}" in
+            *"/download/${TAG}/module.zip") ;;
+            *) echo "::error::module.json download URL does not point at ${TAG}/module.zip"; exit 1 ;;
+          esac
+
+      - name: Build module.zip
+        run: zip -r module.zip module.json CHANGELOG.md lang scripts styles
+
+      - name: Extract release notes from CHANGELOG
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v v="${VERSION}" '
+            $0 ~ "^## \\[" v "\\]" { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then echo "Release ${GITHUB_REF_NAME}" > release-notes.md; fi
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" module.json module.zip \
+            --title "${GITHUB_REF_NAME}" \
+            --notes-file release-notes.md
